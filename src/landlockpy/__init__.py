@@ -12,7 +12,7 @@ Project site: https://landlock.io/
 
 import errno
 
-from . import _syscall
+from . import _syscall, testing
 from .errors import LandlockError, UnsupportedError
 from .flags import (
     AccessFS,
@@ -44,6 +44,7 @@ __all__ = [
     "restrict_for_abi",
     "scope_for_abi",
     "supported",
+    "testing",
 ]
 
 
