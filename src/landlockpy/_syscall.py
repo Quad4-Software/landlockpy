@@ -46,6 +46,8 @@ class PathBeneathAttr(ctypes.Structure):
     """struct landlock_path_beneath_attr. Packed, no trailing padding."""
 
     _pack_ = 1
+    # Explicit layout: the implicit default is deprecated since Python 3.14.
+    _layout_ = "ms"
     _fields_ = [
         ("allowed_access", ctypes.c_uint64),
         ("parent_fd", ctypes.c_int32),
