@@ -13,7 +13,7 @@ mypy strict, ty, and pytest with coverage.
 
 ## Conventions
 
-- No runtime dependencies; the library is stdlib-only.
+- No runtime dependencies. The library is stdlib-only.
 - Source files start with the SPDX license identifier.
 - Public API changes need tests. Enforcement changes need a scenario in
   tests/_sandbox.py that runs against the real kernel.

@@ -2,7 +2,7 @@
 """Access rights, scope flags and restrict flags for Landlock rulesets.
 
 Flag values mirror the constants in linux/landlock.h. Each flag records the
-oldest Landlock ABI version that supports it; use the for_abi helpers to
+oldest Landlock ABI version that supports it. Use the for_abi helpers to
 compute the subset usable on a given kernel.
 
 Kernel reference: https://docs.kernel.org/userspace-api/landlock.html

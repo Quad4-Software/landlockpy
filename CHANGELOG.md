@@ -10,8 +10,8 @@
   ruleset.
 - Fix quiet rule flag on allow_path() and allow_port(): dropped in
   best-effort mode and rejected in strict mode on kernels below ABI 10.
-- Declare explicit ctypes layout on the packed path_beneath struct;
-  the implicit default is deprecated since Python 3.14.
+- Declare explicit ctypes layout on the packed path_beneath struct.
+  The implicit default is deprecated since Python 3.14.
 
 ## 0.1.0 - 2026-09-22
 

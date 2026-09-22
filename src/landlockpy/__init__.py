@@ -67,7 +67,7 @@ def errata() -> int:
 
     Bit N set means erratum N is fixed in the running kernel. Older kernels
     without the errata mechanism report 0. Most applications should not
-    check errata; best-effort enforcement is the safer default.
+    check errata. Best-effort enforcement is the safer default.
     """
     try:
         return _syscall.errata()

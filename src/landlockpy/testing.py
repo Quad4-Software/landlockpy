@@ -36,7 +36,7 @@ class ProbeResult:
 def probe(ruleset: Ruleset, fn: Callable[[], object]) -> ProbeResult:
     """Run fn in a forked child process restricted by ruleset.
 
-    The ruleset must be unenforced; it is enforced in the child only, so
+    The ruleset must be unenforced. It is enforced in the child only, so
     the caller's copy stays usable. The return value of fn is discarded.
     The child exits with os._exit, so atexit handlers, buffered I/O and
     threads do not run there.

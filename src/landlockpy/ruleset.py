@@ -28,8 +28,8 @@ class Ruleset:
     """A Landlock ruleset under construction.
 
     A ruleset declares which access rights it handles. Handled rights are
-    denied by default once the ruleset is enforced; allow_path() and
-    allow_port() then grant back specific rights for specific objects:
+    denied by default once the ruleset is enforced. The allow_path()
+    and allow_port() methods grant back specific rights for specific objects:
 
         with Ruleset() as ruleset:
             ruleset.allow_path("/usr", AccessFS.READ_FILE | AccessFS.READ_DIR)
@@ -186,14 +186,14 @@ class Ruleset:
     ) -> AccessFS:
         """Grant filesystem access rights on a file hierarchy.
 
-        The path can point to a file or a directory; a directory rule covers
+        The path can point to a file or a directory. A directory rule covers
         its whole hierarchy. Access is masked against the handled filesystem
         rights. Returns the rights actually granted, which is empty if none
         of the requested rights are handled and no rule was added.
 
         quiet marks the rule with LANDLOCK_ADD_RULE_QUIET, suppressing audit
-        logs for accesses the ruleset declared quiet. Quiet requires ABI 10;
-        on older kernels it is dropped in best-effort mode or rejected with
+        logs for accesses the ruleset declared quiet. Quiet requires ABI 10.
+        On older kernels it is dropped in best-effort mode or rejected with
         UnsupportedError in strict mode. See "Extending a ruleset" in the
         kernel documentation.
         """
@@ -224,7 +224,7 @@ class Ruleset:
         rights are handled and no rule was added.
 
         A LandlockError with errno EAFNOSUPPORT means the kernel lacks
-        TCP/IP support; the operation is impossible anyway and the error
+        TCP/IP support. The operation is impossible anyway and the error
         can safely be ignored. See "Extending a ruleset" in the kernel
         documentation.
         """
@@ -248,12 +248,12 @@ class Ruleset:
         Flags unsupported by the running kernel are dropped. With
         no_new_privs, the thread is also prevented from gaining privileges
         through suid or file-capability binaries. On ABI 11 and newer this
-        is set atomically with enforcement; on older kernels a
+        is set atomically with enforcement. On older kernels a
         prctl(PR_SET_NO_NEW_PRIVS) call is made first.
 
         Enforcement is irreversible and per-thread. Without the TSYNC flag
         (ABI 8), only the calling thread and its future children are
-        restricted; sibling threads keep their own policy. See "Enforcing
+        restricted. Sibling threads keep their own policy. See "Enforcing
         a ruleset" in the kernel documentation.
         """
         if self._closed:
@@ -276,10 +276,10 @@ class Ruleset:
             self._closed = True
 
     def __copy__(self) -> Ruleset:
-        raise TypeError("Ruleset cannot be copied; it owns a kernel file descriptor")
+        raise TypeError("Ruleset cannot be copied: it owns a kernel file descriptor")
 
     def __deepcopy__(self, memo: dict[int, object]) -> Ruleset:
-        raise TypeError("Ruleset cannot be copied; it owns a kernel file descriptor")
+        raise TypeError("Ruleset cannot be copied: it owns a kernel file descriptor")
 
     def __repr__(self) -> str:
         state = "closed" if self._closed else "enforced" if self._enforced else "open"
