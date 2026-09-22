@@ -5,6 +5,9 @@ Landlock lets unprivileged processes sandbox themselves with filesystem,
 network and IPC restrictions enforced by the kernel. Rulesets are scoped to
 what the running kernel supports, so applications get best-effort protection
 across kernel versions.
+
+Kernel reference: https://docs.kernel.org/userspace-api/landlock.html
+Project site: https://landlock.io/
 """
 
 import errno

@@ -28,13 +28,22 @@ class Ruleset:
     """A Landlock ruleset under construction.
 
     A ruleset declares which access rights it handles. Handled rights are
-    denied by default once the ruleset is enforced; rules then grant back
-    specific rights for specific objects. Rights the running kernel does
-    not support are dropped in best-effort mode, or rejected with
-    UnsupportedError when best_effort is False.
+    denied by default once the ruleset is enforced; allow_path() and
+    allow_port() then grant back specific rights for specific objects:
+
+        with Ruleset() as ruleset:
+            ruleset.allow_path("/usr", AccessFS.READ_FILE | AccessFS.READ_DIR)
+            ruleset.allow_port(443, AccessNet.CONNECT_TCP)
+            ruleset.restrict()
+
+    Rights the running kernel does not support are dropped in best-effort
+    mode (the default), or rejected with UnsupportedError when best_effort
+    is False.
 
     The ruleset owns a kernel file descriptor. Use it as a context manager
     or call close() to release it.
+
+    Kernel reference: https://docs.kernel.org/userspace-api/landlock.html
     """
 
     def __init__(
@@ -161,6 +170,7 @@ class Ruleset:
 
         quiet marks the rule with LANDLOCK_ADD_RULE_QUIET, suppressing audit
         logs for accesses the ruleset declared quiet (requires ABI 10).
+        See "Extending a ruleset" in the kernel documentation.
         """
         self._check_mutable()
         granted = AccessFS(access) & self._handled_fs
@@ -189,7 +199,8 @@ class Ruleset:
 
         A LandlockError with errno EAFNOSUPPORT means the kernel lacks
         TCP/IP support; the operation is impossible anyway and the error
-        can safely be ignored.
+        can safely be ignored. See "Extending a ruleset" in the kernel
+        documentation.
         """
         self._check_mutable()
         if not 0 <= port <= 65535:
@@ -212,6 +223,11 @@ class Ruleset:
         through suid or file-capability binaries. On ABI 11 and newer this
         is set atomically with enforcement; on older kernels a
         prctl(PR_SET_NO_NEW_PRIVS) call is made first.
+
+        Enforcement is irreversible and per-thread. Without the TSYNC flag
+        (ABI 8), only the calling thread and its future children are
+        restricted; sibling threads keep their own policy. See "Enforcing
+        a ruleset" in the kernel documentation.
         """
         if self._closed:
             raise RuntimeError("ruleset is closed")

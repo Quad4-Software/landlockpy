@@ -4,6 +4,8 @@
 Flag values mirror the constants in linux/landlock.h. Each flag records the
 oldest Landlock ABI version that supports it; use the for_abi helpers to
 compute the subset usable on a given kernel.
+
+Kernel reference: https://docs.kernel.org/userspace-api/landlock.html
 """
 
 from enum import IntFlag
@@ -26,7 +28,12 @@ LATEST_ABI = 11
 
 
 class AccessFS(IntFlag):
-    """Filesystem access rights for handled_access_fs and path rules."""
+    """Filesystem access rights, mirroring LANDLOCK_ACCESS_FS_*.
+
+    Used in the handled_access_fs field of a ruleset and in the
+    allowed_access field of path rules. See "Filesystem flags" in the
+    kernel documentation.
+    """
 
     NONE = 0
     EXECUTE = 1 << 0
@@ -49,7 +56,12 @@ class AccessFS(IntFlag):
 
 
 class AccessNet(IntFlag):
-    """Network access rights for handled_access_net and port rules."""
+    """Network access rights, mirroring LANDLOCK_ACCESS_NET_*.
+
+    Used in the handled_access_net field of a ruleset and in the
+    allowed_access field of port rules. See "Network flags" in the
+    kernel documentation.
+    """
 
     NONE = 0
     BIND_TCP = 1 << 0
@@ -59,7 +71,12 @@ class AccessNet(IntFlag):
 
 
 class Scope(IntFlag):
-    """Scope flags isolating a Landlock domain from outside IPC resources."""
+    """Scope flags, mirroring LANDLOCK_SCOPE_*.
+
+    Set on a ruleset to isolate the domain from resources outside it,
+    such as abstract UNIX sockets or signals. See "Scope flags" in the
+    kernel documentation.
+    """
 
     NONE = 0
     ABSTRACT_UNIX_SOCKET = 1 << 0
@@ -67,7 +84,10 @@ class Scope(IntFlag):
 
 
 class RestrictFlag(IntFlag):
-    """Flags accepted by landlock_restrict_self."""
+    """Flags accepted by landlock_restrict_self, mirroring
+    LANDLOCK_RESTRICT_SELF_*. See "Enforcing a ruleset" in the kernel
+    documentation.
+    """
 
     NONE = 0
     LOG_SAME_EXEC_OFF = 1 << 0

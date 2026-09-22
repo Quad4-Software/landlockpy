@@ -3,14 +3,14 @@
 [![CI](https://github.com/Quad4-Software/landlockpy/actions/workflows/ci.yml/badge.svg)](https://github.com/Quad4-Software/landlockpy/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Quad4-Software/landlockpy/actions/workflows/codeql.yml/badge.svg)](https://github.com/Quad4-Software/landlockpy/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Quad4-Software/landlockpy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Quad4-Software/landlockpy)
-[![PyPI](https://img.shields.io/pypi/v/landlockpy)](https://pypi.org/project/landlockpy/)
+[![License: 0BSD](https://img.shields.io/badge/license-0BSD-blue)](LICENSE)
 
 Dependency-free Python bindings for the Landlock Linux security module.
 Landlock lets unprivileged processes sandbox themselves with filesystem,
 network and IPC restrictions enforced by the kernel. Supports ABI versions
 1 through 11 with best-effort degradation on older kernels.
 
-Requires Linux 5.13 or newer with Landlock enabled in the LSM list.
+Requires Python 3.10+ and Linux 5.13+ with Landlock enabled in the LSM list.
 
 ## Install
 
@@ -33,5 +33,11 @@ with Ruleset() as ruleset:
 
 `landlockpy.supported()` reports whether the running kernel has Landlock,
 and `landlockpy.abi_version()` returns its ABI version.
+
+## Documentation
+
+- API: docstrings in `src/landlockpy/`, mostly `ruleset.py`
+- Landlock API reference: https://docs.kernel.org/userspace-api/landlock.html
+- Project site: https://landlock.io/
 
 License: 0BSD.
