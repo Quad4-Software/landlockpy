@@ -46,6 +46,17 @@ class Ruleset:
     Kernel reference: https://docs.kernel.org/userspace-api/landlock.html
     """
 
+    __slots__ = (
+        "_abi",
+        "_best_effort",
+        "_closed",
+        "_enforced",
+        "_fd",
+        "_handled_fs",
+        "_handled_net",
+        "_scoped",
+    )
+
     def __init__(
         self,
         *,
@@ -57,6 +68,10 @@ class Ruleset:
         quiet_scoped: Scope = Scope.NONE,
         best_effort: bool = True,
     ) -> None:
+        self._fd = -1
+        self._closed = True
+        self._enforced = False
+        self._best_effort = best_effort
         self._abi = _syscall.abi_version()
 
         req_fs = fs_for_abi(LATEST_ABI) if handled_fs is None else AccessFS(handled_fs)
@@ -108,7 +123,6 @@ class Ruleset:
         self._fd = _syscall.create_ruleset(attr)
         os.set_inheritable(self._fd, False)
         self._closed = False
-        self._enforced = False
 
     @staticmethod
     def _reject_unsupported(requested: int, supported: int, kind: str) -> None:
@@ -117,6 +131,13 @@ class Ruleset:
             raise UnsupportedError(
                 f"kernel does not support requested {kind} rights: {missing:#x}"
             )
+
+    def _gate_quiet(self, quiet: bool) -> bool:
+        if quiet and self._abi < 10:
+            if not self._best_effort:
+                raise UnsupportedError("quiet rules require ABI 10")
+            return False
+        return quiet
 
     @property
     def abi_version(self) -> int:
@@ -150,6 +171,8 @@ class Ruleset:
 
     def fileno(self) -> int:
         """Return the underlying ruleset file descriptor."""
+        if self._closed:
+            raise ValueError("ruleset is closed")
         return self._fd
 
     def _check_mutable(self) -> None:
@@ -169,10 +192,13 @@ class Ruleset:
         of the requested rights are handled and no rule was added.
 
         quiet marks the rule with LANDLOCK_ADD_RULE_QUIET, suppressing audit
-        logs for accesses the ruleset declared quiet (requires ABI 10).
-        See "Extending a ruleset" in the kernel documentation.
+        logs for accesses the ruleset declared quiet. Quiet requires ABI 10;
+        on older kernels it is dropped in best-effort mode or rejected with
+        UnsupportedError in strict mode. See "Extending a ruleset" in the
+        kernel documentation.
         """
         self._check_mutable()
+        quiet = self._gate_quiet(quiet)
         granted = AccessFS(access) & self._handled_fs
         if not granted:
             return AccessFS.NONE
@@ -205,6 +231,7 @@ class Ruleset:
         self._check_mutable()
         if not 0 <= port <= 65535:
             raise ValueError(f"port out of range: {port}")
+        quiet = self._gate_quiet(quiet)
         granted = AccessNet(access) & self._handled_net
         if not granted:
             return AccessNet.NONE
@@ -248,7 +275,20 @@ class Ruleset:
             os.close(self._fd)
             self._closed = True
 
+    def __copy__(self) -> Ruleset:
+        raise TypeError("Ruleset cannot be copied; it owns a kernel file descriptor")
+
+    def __deepcopy__(self, memo: dict[int, object]) -> Ruleset:
+        raise TypeError("Ruleset cannot be copied; it owns a kernel file descriptor")
+
+    def __repr__(self) -> str:
+        state = "closed" if self._closed else "enforced" if self._enforced else "open"
+        abi = getattr(self, "_abi", "?")
+        return f"{type(self).__name__}(fd={self._fd}, abi={abi}, {state})"
+
     def __enter__(self) -> Ruleset:
+        if self._closed:
+            raise RuntimeError("ruleset is closed")
         return self
 
     def __exit__(
