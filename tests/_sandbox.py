@@ -10,6 +10,7 @@ import errno
 import os
 import socket
 import sys
+import threading
 from pathlib import Path
 
 from landlockpy import AccessFS, AccessNet, Ruleset, Scope
@@ -127,6 +128,60 @@ def scenario_abstract() -> None:
         sock.close()
 
 
+def scenario_threads(denied_dir: str) -> None:
+    """Without TSYNC, only the calling thread and its children are restricted.
+
+    A sibling thread started before restrict() keeps its own policy. A
+    thread started after restrict() inherits the domain and is denied.
+    """
+    denied = Path(denied_dir, "secret.txt")
+    sibling_outcome: list[str] = []
+    go = threading.Event()
+    done = threading.Event()
+
+    def sibling() -> None:
+        go.wait(10)
+        try:
+            denied.read_text()
+            sibling_outcome.append("allowed")
+        except OSError as exc:
+            sibling_outcome.append(str(exc.errno))
+        finally:
+            done.set()
+
+    sibling_thread = threading.Thread(target=sibling)
+    sibling_thread.start()
+
+    with Ruleset() as ruleset:
+        ruleset.restrict()
+
+    child_outcome: list[str] = []
+
+    def child() -> None:
+        try:
+            denied.read_text()
+            child_outcome.append("allowed")
+        except OSError as exc:
+            child_outcome.append(str(exc.errno))
+
+    go.set()
+    done.wait(10)
+    child_thread = threading.Thread(target=child)
+    child_thread.start()
+    child_thread.join(10)
+
+    check(
+        "sibling thread keeps its policy",
+        sibling_outcome == ["allowed"],
+        str(sibling_outcome),
+    )
+    check(
+        "child thread inherits the domain",
+        child_outcome == [str(errno.EACCES)],
+        str(child_outcome),
+    )
+
+
 def main() -> int:
     scenario = sys.argv[1]
     if scenario == "fs":
@@ -139,6 +194,8 @@ def main() -> int:
         scenario_udp(int(sys.argv[2]), int(sys.argv[3]))
     elif scenario == "abstract":
         scenario_abstract()
+    elif scenario == "threads":
+        scenario_threads(sys.argv[2])
     else:
         print(f"unknown scenario {scenario}", file=sys.stderr)
         return 2

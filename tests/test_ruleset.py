@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: 0BSD
 
+import copy
+import fcntl
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -192,6 +194,88 @@ def test_restrict_can_skip_nnp(
         ruleset.restrict(no_new_privs=False)
     assert fake_kernel.restricted == 0
     assert fake_kernel.nnp == 0
+
+
+def test_quiet_rule_flag_dropped_on_old_abi(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    set_abi(monkeypatch, 9)
+    with Ruleset() as ruleset:
+        granted = ruleset.allow_path(tmp_path, AccessFS.READ_FILE, quiet=True)
+    assert granted == AccessFS.READ_FILE
+    assert fake_kernel.rules[0][2] == 0
+
+
+def test_quiet_rule_flag_raises_in_strict_mode(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    set_abi(monkeypatch, 9)
+    with (
+        Ruleset(
+            handled_fs=AccessFS.READ_FILE,
+            handled_net=AccessNet.BIND_TCP,
+            best_effort=False,
+        ) as ruleset,
+        pytest.raises(UnsupportedError, match="quiet"),
+    ):
+        ruleset.allow_path(tmp_path, AccessFS.READ_FILE, quiet=True)
+
+
+def test_allow_path_missing_path_propagates(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    set_abi(monkeypatch, 11)
+    with Ruleset() as ruleset, pytest.raises(FileNotFoundError):
+        ruleset.allow_path(tmp_path / "missing", AccessFS.READ_FILE)
+
+
+def test_fileno_raises_when_closed(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    ruleset = Ruleset()
+    ruleset.close()
+    with pytest.raises(ValueError, match="closed"):
+        ruleset.fileno()
+
+
+def test_enter_closed_ruleset_raises(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    ruleset = Ruleset()
+    ruleset.close()
+    with pytest.raises(RuntimeError, match="closed"), ruleset:
+        pass
+
+
+def test_ruleset_cannot_be_copied(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    with Ruleset() as ruleset:
+        with pytest.raises(TypeError):
+            copy.copy(ruleset)
+        with pytest.raises(TypeError):
+            copy.deepcopy(ruleset)
+
+
+def test_repr(fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    set_abi(monkeypatch, 11)
+    ruleset = Ruleset()
+    assert repr(ruleset).startswith("Ruleset(fd=")
+    assert "abi=11" in repr(ruleset)
+    ruleset.close()
+    assert "closed" in repr(ruleset)
+
+
+def test_fd_is_close_on_exec(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    with Ruleset() as ruleset:
+        flags = fcntl.fcntl(ruleset.fileno(), fcntl.F_GETFD)
+        assert flags & fcntl.FD_CLOEXEC
 
 
 def test_state_guards(

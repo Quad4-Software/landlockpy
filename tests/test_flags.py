@@ -1,5 +1,11 @@
 # SPDX-License-Identifier: 0BSD
 
+from collections.abc import Callable, Iterable
+from enum import IntFlag
+
+from hypothesis import given
+from hypothesis import strategies as st
+
 from landlockpy import AccessFS, AccessNet, RestrictFlag, Scope, flags
 from landlockpy.flags import (
     fs_for_abi,
@@ -116,3 +122,64 @@ def test_latest_abi_covers_everything() -> None:
             assert member.value == 0 or member.value & int(full), (
                 f"{member} not covered at LATEST_ABI"
             )
+
+
+_Table = tuple[type[IntFlag], Iterable[tuple[IntFlag, int]], Callable[[int], IntFlag]]
+
+_TABLES: tuple[_Table, ...] = (
+    (AccessFS, flags._FS_MIN_ABI.items(), fs_for_abi),
+    (AccessNet, flags._NET_MIN_ABI.items(), net_for_abi),
+    (Scope, flags._SCOPE_MIN_ABI.items(), scope_for_abi),
+    (RestrictFlag, flags._RESTRICT_MIN_ABI.items(), restrict_for_abi),
+)
+
+
+def test_every_flag_has_a_min_abi_entry() -> None:
+    for flag_type, table, _ in _TABLES:
+        covered = {flag for flag, _ in table}
+        for member in flag_type:
+            if member.value:
+                assert member in covered, f"{member} missing from min-ABI table"
+
+
+def test_each_flag_appears_exactly_at_its_min_abi() -> None:
+    for _, table, for_abi in _TABLES:
+        for flag, min_abi in table:
+            assert flag in for_abi(min_abi), flag
+            if min_abi > 1:
+                assert flag not in for_abi(min_abi - 1), flag
+
+
+def test_for_abi_zero_is_empty() -> None:
+    for flag_type, _, for_abi in _TABLES:
+        assert for_abi(0) == flag_type(0)
+
+
+def test_for_abi_future_covers_everything() -> None:
+    for flag_type, _, for_abi in _TABLES:
+        full = flag_type(0)
+        for member in flag_type:
+            full |= member
+        assert for_abi(flags.LATEST_ABI + 100) == full
+
+
+@given(abi=st.integers(min_value=0, max_value=64))
+def test_for_abi_is_monotonic(abi: int) -> None:
+    for _, _, for_abi in _TABLES:
+        lower = for_abi(abi)
+        upper = for_abi(abi + 1)
+        assert int(lower & upper) == int(lower)
+
+
+@given(abi=st.integers(min_value=0, max_value=64))
+def test_for_abi_only_returns_known_flags(abi: int) -> None:
+    for flag_type, _, for_abi in _TABLES:
+        mask = for_abi(abi)
+        assert int(mask) & ~int(_all_bits(flag_type)) == 0
+
+
+def _all_bits(flag_type: type[IntFlag]) -> IntFlag:
+    all_flags = flag_type(0)
+    for member in flag_type:
+        all_flags |= member
+    return all_flags

@@ -61,3 +61,10 @@ def test_unexpected_errors_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_syscall, "abi_version", raise_efault)
     with pytest.raises(LandlockError):
         abi_version()
+
+
+def test_errors_carry_errno() -> None:
+    err = LandlockError(errno.EACCES, "denied")
+    assert err.errno == errno.EACCES
+    assert isinstance(err, OSError)
+    assert isinstance(UnsupportedError(errno.ENOSYS, "x"), LandlockError)

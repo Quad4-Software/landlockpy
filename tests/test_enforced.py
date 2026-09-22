@@ -48,6 +48,14 @@ def test_abstract_socket_scope(sandbox: Sandbox) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_thread_isolation(sandbox: Sandbox, tmp_path: Path) -> None:
+    denied = tmp_path / "denied"
+    denied.mkdir()
+    (denied / "secret.txt").write_text("secret")
+    result = sandbox("threads", denied)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.skipif(landlockpy.abi_version() < 10, reason="UDP rules need ABI 10")
 def test_udp_enforcement(sandbox: Sandbox) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
