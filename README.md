@@ -1,5 +1,6 @@
 # landlockpy
 
+[![PyPI](https://img.shields.io/pypi/v/landlockpy)](https://pypi.org/project/landlockpy/)
 [![CI](https://github.com/Quad4-Software/landlockpy/actions/workflows/ci.yml/badge.svg)](https://github.com/Quad4-Software/landlockpy/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Quad4-Software/landlockpy/actions/workflows/codeql.yml/badge.svg)](https://github.com/Quad4-Software/landlockpy/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/Quad4-Software/landlockpy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/Quad4-Software/landlockpy)
