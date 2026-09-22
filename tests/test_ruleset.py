@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: 0BSD
 
 import copy
+import errno
 import fcntl
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 from landlockpy import (
     AccessFS,
     AccessNet,
+    LandlockError,
     RestrictFlag,
     Ruleset,
     Scope,
@@ -229,30 +231,24 @@ def test_allow_path_missing_path_propagates(
         ruleset.allow_path(tmp_path / "missing", AccessFS.READ_FILE)
 
 
-def test_fileno_raises_when_closed(
-    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    set_abi(monkeypatch, 11)
+@requires_landlock
+def test_fileno_raises_when_closed() -> None:
     ruleset = Ruleset()
     ruleset.close()
     with pytest.raises(ValueError, match="closed"):
         ruleset.fileno()
 
 
-def test_enter_closed_ruleset_raises(
-    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    set_abi(monkeypatch, 11)
+@requires_landlock
+def test_enter_closed_ruleset_raises() -> None:
     ruleset = Ruleset()
     ruleset.close()
     with pytest.raises(RuntimeError, match="closed"), ruleset:
         pass
 
 
-def test_ruleset_cannot_be_copied(
-    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    set_abi(monkeypatch, 11)
+@requires_landlock
+def test_ruleset_cannot_be_copied() -> None:
     with Ruleset() as ruleset:
         with pytest.raises(TypeError):
             copy.copy(ruleset)
@@ -260,19 +256,17 @@ def test_ruleset_cannot_be_copied(
             copy.deepcopy(ruleset)
 
 
-def test_repr(fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
-    set_abi(monkeypatch, 11)
+@requires_landlock
+def test_repr() -> None:
     ruleset = Ruleset()
     assert repr(ruleset).startswith("Ruleset(fd=")
-    assert "abi=11" in repr(ruleset)
+    assert f"abi={abi_version()}" in repr(ruleset)
     ruleset.close()
     assert "closed" in repr(ruleset)
 
 
-def test_fd_is_close_on_exec(
-    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    set_abi(monkeypatch, 11)
+@requires_landlock
+def test_fd_is_close_on_exec() -> None:
     with Ruleset() as ruleset:
         flags = fcntl.fcntl(ruleset.fileno(), fcntl.F_GETFD)
         assert flags & fcntl.FD_CLOEXEC
@@ -300,5 +294,15 @@ def test_real_kernel_roundtrip(tmp_path: Path) -> None:
         assert ruleset.abi_version == abi_version() >= 1
         granted = ruleset.allow_path(tmp_path, AccessFS.READ_FILE)
         assert granted == AccessFS.READ_FILE
+        try:
+            granted_net = ruleset.allow_port(443, AccessNet.CONNECT_TCP)
+        except LandlockError as exc:
+            # Kernels built without CONFIG_INET answer EAFNOSUPPORT.
+            assert exc.errno == errno.EAFNOSUPPORT
+        else:
+            if ruleset.abi_version >= 4:
+                assert granted_net == AccessNet.CONNECT_TCP
+            else:
+                assert granted_net == AccessNet.NONE
         assert ruleset.fileno() >= 0
     assert ruleset.closed

@@ -47,6 +47,29 @@ def scenario_fs(allowed_dir: str, denied_dir: str) -> None:
         check("write under allowed dir", exc.errno == errno.EACCES, str(exc))
 
 
+def scenario_guards(denied_dir: str) -> None:
+    """After a real restrict(), the ruleset refuses further mutation."""
+    denied = Path(denied_dir, "secret.txt")
+    with Ruleset() as ruleset:
+        ruleset.restrict()
+        try:
+            ruleset.allow_path(denied_dir, AccessFS.READ_FILE)
+            check("allow_path after restrict", False, "no error raised")
+        except RuntimeError:
+            pass
+        try:
+            ruleset.restrict()
+            check("second restrict", False, "no error raised")
+        except RuntimeError:
+            pass
+
+    try:
+        denied.read_text()
+        check("read under enforcement", False, "no error raised")
+    except PermissionError as exc:
+        check("read under enforcement", exc.errno == errno.EACCES, str(exc))
+
+
 def scenario_nnp() -> None:
     """no_new_privs is set as part of restrict()."""
     fd = os.open("/proc/self/status", os.O_RDONLY)
@@ -64,7 +87,7 @@ def scenario_nnp() -> None:
 
 
 def scenario_net(denied_port: int) -> None:
-    """Only ephemeral TCP binds are granted; fixed-port connect is denied."""
+    """Only ephemeral TCP binds are granted. Fixed-port connect is denied."""
     with Ruleset() as ruleset:
         ruleset.allow_port(0, AccessNet.BIND_TCP)
         ruleset.restrict()
@@ -186,6 +209,8 @@ def main() -> int:
     scenario = sys.argv[1]
     if scenario == "fs":
         scenario_fs(sys.argv[2], sys.argv[3])
+    elif scenario == "guards":
+        scenario_guards(sys.argv[2])
     elif scenario == "nnp":
         scenario_nnp()
     elif scenario == "net":

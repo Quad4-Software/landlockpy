@@ -30,6 +30,14 @@ def test_no_new_privs_set_on_restrict(sandbox: Sandbox) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_state_guards_under_enforcement(sandbox: Sandbox, tmp_path: Path) -> None:
+    denied = tmp_path / "denied"
+    denied.mkdir()
+    (denied / "secret.txt").write_text("secret")
+    result = sandbox("guards", denied)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.skipif(landlockpy.abi_version() < 4, reason="network rules need ABI 4")
 def test_net_enforcement(sandbox: Sandbox) -> None:
     result = sandbox("net", 45678)
