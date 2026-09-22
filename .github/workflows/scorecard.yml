@@ -4,6 +4,7 @@ on:
   branch_protection_rule:
   push:
     branches: [master]
+  workflow_dispatch:
   schedule:
     - cron: "42 5 * * 6"
 
