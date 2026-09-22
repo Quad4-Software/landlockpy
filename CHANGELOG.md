@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Add landlockpy.testing with probe() and probe_path() for running a
+  callable under a ruleset in a forked child without enforcing it in
+  the caller.
+- Ruleset: add __repr__, reject copy/deepcopy, raise ValueError from
+  fileno() when closed, raise RuntimeError when entering a closed
+  ruleset.
+- Fix quiet rule flag on allow_path() and allow_port(): dropped in
+  best-effort mode and rejected in strict mode on kernels below ABI 10.
+
 ## 0.1.0 - 2026-09-22
 
 Initial release.
