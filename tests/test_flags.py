@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: 0BSD
 
-import landlockpy.flags as flags
-from landlockpy import AccessFS, AccessNet, RestrictFlag, Scope
+from landlockpy import AccessFS, AccessNet, RestrictFlag, Scope, flags
 from landlockpy.flags import (
     fs_for_abi,
     net_for_abi,

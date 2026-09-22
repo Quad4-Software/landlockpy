@@ -4,21 +4,28 @@ import errno
 
 import pytest
 
-import landlockpy
-from landlockpy import LandlockError, Ruleset, UnsupportedError, _syscall
+from landlockpy import (
+    LandlockError,
+    Ruleset,
+    UnsupportedError,
+    _syscall,
+    abi_version,
+    errata,
+    supported,
+)
 
 from .conftest import requires_landlock
 
 
 @requires_landlock
 def test_abi_version_matches_kernel() -> None:
-    assert landlockpy.abi_version() >= 1
-    assert landlockpy.supported()
+    assert abi_version() >= 1
+    assert supported()
 
 
 @requires_landlock
 def test_errata_returns_bitmask() -> None:
-    assert landlockpy.errata() >= 0
+    assert errata() >= 0
 
 
 def test_abi_version_zero_when_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -26,8 +33,8 @@ def test_abi_version_zero_when_unsupported(monkeypatch: pytest.MonkeyPatch) -> N
         raise UnsupportedError(errno.ENOSYS, "Function not implemented")
 
     monkeypatch.setattr(_syscall, "abi_version", raise_enosys)
-    assert landlockpy.abi_version() == 0
-    assert not landlockpy.supported()
+    assert abi_version() == 0
+    assert not supported()
 
 
 def test_errata_zero_on_old_kernels(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -35,7 +42,7 @@ def test_errata_zero_on_old_kernels(monkeypatch: pytest.MonkeyPatch) -> None:
         raise LandlockError(errno.EINVAL, "Invalid argument")
 
     monkeypatch.setattr(_syscall, "errata", raise_einval)
-    assert landlockpy.errata() == 0
+    assert errata() == 0
 
 
 def test_ruleset_raises_when_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -53,4 +60,4 @@ def test_unexpected_errors_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(_syscall, "abi_version", raise_efault)
     with pytest.raises(LandlockError):
-        landlockpy.abi_version()
+        abi_version()

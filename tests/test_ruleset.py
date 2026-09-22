@@ -6,7 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from landlockpy import AccessFS, AccessNet, RestrictFlag, Ruleset, Scope, _syscall
+from landlockpy import (
+    AccessFS,
+    AccessNet,
+    RestrictFlag,
+    Ruleset,
+    Scope,
+    _syscall,
+    abi_version,
+)
 from landlockpy.errors import UnsupportedError
 
 from .conftest import requires_landlock
@@ -204,10 +212,8 @@ def test_state_guards(
 
 @requires_landlock
 def test_real_kernel_roundtrip(tmp_path: Path) -> None:
-    import landlockpy
-
     with Ruleset() as ruleset:
-        assert ruleset.abi_version == landlockpy.abi_version() >= 1
+        assert ruleset.abi_version == abi_version() >= 1
         granted = ruleset.allow_path(tmp_path, AccessFS.READ_FILE)
         assert granted == AccessFS.READ_FILE
         assert ruleset.fileno() >= 0
