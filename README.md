@@ -13,6 +13,8 @@ network and IPC restrictions enforced by the kernel. Supports ABI versions
 
 Requires Python 3.10+ and Linux 5.13+ with Landlock enabled in the LSM list.
 
+Used in: [MeshChatX](https://github.com/Quad4-Software/MeshChatX)
+
 ## Install
 
     pip install landlockpy
