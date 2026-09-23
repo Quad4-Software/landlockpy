@@ -16,7 +16,8 @@ HELPER = Path(__file__).resolve().parent / "_sandbox.py"
 Sandbox = Callable[..., "subprocess.CompletedProcess[str]"]
 
 requires_landlock = pytest.mark.skipif(
-    landlockpy.abi_version() < 1, reason="kernel does not support Landlock"
+    landlockpy.abi_version() < 1 and os.environ.get("Q4_REQUIRE_LIVE") != "1",
+    reason="kernel does not support Landlock",
 )
 
 
