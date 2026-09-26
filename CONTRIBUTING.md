@@ -9,7 +9,9 @@ security@quad4.io (see SECURITY.md).
     make check
 
 `make check` runs the full local gate: ruff lint and format, bandit,
-mypy strict, ty, and pytest with coverage.
+mypy strict, ty, pytest with coverage, and a strict mkdocs build.
+`make docs` builds the site; preview it with
+`uv run --group docs mkdocs serve`.
 
 ## Conventions
 

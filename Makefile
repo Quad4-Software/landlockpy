@@ -1,6 +1,6 @@
-.PHONY: check lint test build
+.PHONY: check lint test build docs
 
-check: lint test
+check: lint test docs
 
 lint:
 	uv run ruff check .
@@ -11,6 +11,9 @@ lint:
 
 test:
 	uv run pytest --cov --cov-report=term-missing
+
+docs:
+	uv run --group docs mkdocs build --strict
 
 build:
 	uv build
