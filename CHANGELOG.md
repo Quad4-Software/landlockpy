@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-09-26
 
 - Add landlockpy.mute_subdomain_logs() wrapping the
   landlock_restrict_self(-1) call that suppresses audit logging for
