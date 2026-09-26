@@ -11,9 +11,16 @@ import os
 import socket
 import sys
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
-from landlockpy import AccessFS, AccessNet, Ruleset, Scope
+from landlockpy import (
+    AccessFS,
+    AccessNet,
+    Ruleset,
+    Scope,
+    mute_subdomain_logs,
+)
 
 failures: list[str] = []
 
@@ -132,6 +139,12 @@ def scenario_udp(allowed_port: int, denied_port: int) -> None:
         sock.close()
 
 
+def scenario_mute() -> None:
+    """Subdomain log muting without a domain is accepted by the kernel."""
+    mute_subdomain_logs()
+    mute_subdomain_logs(all_threads=True)
+
+
 def scenario_abstract() -> None:
     """Abstract UNIX sockets outside the domain refuse the connection."""
     with Ruleset(scoped=Scope.ABSTRACT_UNIX_SOCKET) as ruleset:
@@ -205,25 +218,25 @@ def scenario_threads(denied_dir: str) -> None:
     )
 
 
+SCENARIOS: dict[str, Callable[[list[str]], None]] = {
+    "fs": lambda a: scenario_fs(a[0], a[1]),
+    "guards": lambda a: scenario_guards(a[0]),
+    "nnp": lambda a: scenario_nnp(),
+    "mute": lambda a: scenario_mute(),
+    "net": lambda a: scenario_net(int(a[0])),
+    "udp": lambda a: scenario_udp(int(a[0]), int(a[1])),
+    "abstract": lambda a: scenario_abstract(),
+    "threads": lambda a: scenario_threads(a[0]),
+}
+
+
 def main() -> int:
-    scenario = sys.argv[1]
-    if scenario == "fs":
-        scenario_fs(sys.argv[2], sys.argv[3])
-    elif scenario == "guards":
-        scenario_guards(sys.argv[2])
-    elif scenario == "nnp":
-        scenario_nnp()
-    elif scenario == "net":
-        scenario_net(int(sys.argv[2]))
-    elif scenario == "udp":
-        scenario_udp(int(sys.argv[2]), int(sys.argv[3]))
-    elif scenario == "abstract":
-        scenario_abstract()
-    elif scenario == "threads":
-        scenario_threads(sys.argv[2])
-    else:
-        print(f"unknown scenario {scenario}", file=sys.stderr)
+    name = sys.argv[1]
+    run = SCENARIOS.get(name)
+    if run is None:
+        print(f"unknown scenario {name}", file=sys.stderr)
         return 2
+    run(sys.argv[2:])
 
     for failure in failures:
         print(f"FAIL {failure}")

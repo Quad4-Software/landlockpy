@@ -30,6 +30,14 @@ def test_no_new_privs_set_on_restrict(sandbox: Sandbox) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.skipif(
+    landlockpy.abi_version() < 8, reason="subdomain log control needs ABI 8"
+)
+def test_mute_subdomain_logs(sandbox: Sandbox) -> None:
+    result = sandbox("mute")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_state_guards_under_enforcement(sandbox: Sandbox, tmp_path: Path) -> None:
     denied = tmp_path / "denied"
     denied.mkdir()

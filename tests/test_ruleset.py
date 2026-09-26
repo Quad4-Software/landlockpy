@@ -4,8 +4,10 @@ import copy
 import errno
 import fcntl
 import os
+import pickle
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -18,6 +20,7 @@ from landlockpy import (
     Scope,
     _syscall,
     abi_version,
+    mute_subdomain_logs,
 )
 from landlockpy.errors import UnsupportedError
 
@@ -27,7 +30,9 @@ from .conftest import requires_landlock
 @pytest.fixture
 def fake_kernel(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Replace the syscall layer with a recorder and a real throwaway fd."""
-    calls = SimpleNamespace(attr=None, rules=[], restricted=None, nnp=0)
+    calls = SimpleNamespace(
+        attr=None, rules=[], restricted=None, restricted_fd=None, nnp=0
+    )
 
     def fake_create(attr: _syscall.RulesetAttr) -> int:
         calls.attr = attr
@@ -39,12 +44,14 @@ def fake_kernel(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     def fake_net(ruleset_fd: int, attr: _syscall.NetPortAttr, flags: int) -> None:
         calls.rules.append(("net", attr.allowed_access, attr.port, flags))
 
+    def fake_restrict(ruleset_fd: int, flags: int) -> None:
+        calls.restricted = flags
+        calls.restricted_fd = ruleset_fd
+
     monkeypatch.setattr(_syscall, "create_ruleset", fake_create)
     monkeypatch.setattr(_syscall, "add_path_beneath", fake_path)
     monkeypatch.setattr(_syscall, "add_net_port", fake_net)
-    monkeypatch.setattr(
-        _syscall, "restrict_self", lambda fd, flags: setattr(calls, "restricted", flags)
-    )
+    monkeypatch.setattr(_syscall, "restrict_self", fake_restrict)
     monkeypatch.setattr(
         _syscall, "set_no_new_privs", lambda: setattr(calls, "nnp", calls.nnp + 1)
     )
@@ -306,3 +313,144 @@ def test_real_kernel_roundtrip(tmp_path: Path) -> None:
                 assert granted_net == AccessNet.NONE
         assert ruleset.fileno() >= 0
     assert ruleset.closed
+
+
+def test_strict_mode_rejects_unsupported_restrict_flags(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 7)
+    with Ruleset(
+        handled_fs=AccessFS.READ_FILE,
+        handled_net=AccessNet.BIND_TCP,
+        best_effort=False,
+    ) as ruleset:
+        with pytest.raises(UnsupportedError):
+            ruleset.restrict(RestrictFlag.TSYNC)
+        ruleset.restrict(RestrictFlag.LOG_NEW_EXEC_ON)
+    assert fake_kernel.restricted == int(RestrictFlag.LOG_NEW_EXEC_ON)
+    assert fake_kernel.nnp == 1
+
+
+def test_quiet_rejected_in_strict_mode_on_old_abi(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 9)
+    with pytest.raises(UnsupportedError, match="quiet"):
+        Ruleset(
+            handled_fs=AccessFS.READ_FILE,
+            handled_net=AccessNet.NONE,
+            quiet_fs=AccessFS.READ_FILE,
+            best_effort=False,
+        )
+
+
+def test_quiet_net_must_be_subset(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    with pytest.raises(ValueError, match="subset"):
+        Ruleset(handled_net=AccessNet.BIND_TCP, quiet_net=AccessNet.CONNECT_TCP)
+
+
+def test_allow_port_skips_when_nothing_granted(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 3)
+    with Ruleset() as ruleset:
+        granted = ruleset.allow_port(80, AccessNet.BIND_TCP)
+    assert granted == AccessNet.NONE
+    assert fake_kernel.rules == []
+
+
+def test_allow_port_rejects_non_int(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    not_an_int: Any = 443.5
+    with Ruleset() as ruleset, pytest.raises(TypeError):
+        ruleset.allow_port(not_an_int, AccessNet.CONNECT_TCP)
+
+
+def test_fd_closed_if_setup_fails(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    fds: list[int] = []
+    closed: list[int] = []
+
+    def boom(fd: int, inheritable: bool) -> None:
+        fds.append(fd)
+        raise OSError("set_inheritable failed")
+
+    real_close = os.close
+
+    def spy_close(fd: int) -> None:
+        closed.append(fd)
+        real_close(fd)
+
+    monkeypatch.setattr(os, "set_inheritable", boom)
+    monkeypatch.setattr(os, "close", spy_close)
+    with pytest.raises(OSError, match="set_inheritable"):
+        Ruleset()
+    assert closed == fds
+
+
+@requires_landlock
+def test_ruleset_cannot_be_pickled() -> None:
+    with Ruleset() as ruleset, pytest.raises(TypeError, match="pickled"):
+        pickle.dumps(ruleset)
+
+
+def test_mute_subdomain_logs(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 7)
+    mute_subdomain_logs()
+    assert fake_kernel.restricted_fd == -1
+    assert fake_kernel.restricted == int(RestrictFlag.LOG_SUBDOMAINS_OFF)
+    assert fake_kernel.nnp == 1
+
+
+def test_mute_subdomain_logs_all_threads(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 8)
+    mute_subdomain_logs(all_threads=True)
+    assert fake_kernel.restricted_fd == -1
+    assert fake_kernel.restricted == int(
+        RestrictFlag.LOG_SUBDOMAINS_OFF | RestrictFlag.TSYNC
+    )
+
+
+def test_mute_subdomain_logs_old_abi(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 6)
+    with pytest.raises(UnsupportedError, match="ABI 7"):
+        mute_subdomain_logs()
+    assert fake_kernel.restricted is None
+
+    set_abi(monkeypatch, 7)
+    with pytest.raises(UnsupportedError, match="ABI 8"):
+        mute_subdomain_logs(all_threads=True)
+    assert fake_kernel.restricted is None
+
+
+def test_quiet_dropped_in_best_effort_on_old_abi(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 9)
+    with Ruleset(handled_fs=AccessFS.READ_FILE, quiet_fs=AccessFS.READ_FILE):
+        pass
+    assert fake_kernel.attr.quiet_access_fs == 0
+
+
+def test_restrict_on_closed_ruleset(
+    fake_kernel: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_abi(monkeypatch, 11)
+    ruleset = Ruleset()
+    ruleset.close()
+    with pytest.raises(RuntimeError, match="closed"):
+        ruleset.restrict()
+    assert fake_kernel.restricted is None
