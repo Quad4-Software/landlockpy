@@ -13,7 +13,8 @@ network and IPC restrictions enforced by the kernel. Supports ABI versions
 
 Requires Python 3.10+ and Linux 5.13+ with Landlock enabled in the LSM list.
 
-Used in: [MeshChatX](https://github.com/Quad4-Software/MeshChatX)
+Used in: [MeshChatX](https://github.com/Quad4-Software/MeshChatX),
+[LXMFy](https://github.com/Quad4-Software/LXMFy)
 
 ## Install
 
@@ -39,6 +40,7 @@ and `landlockpy.abi_version()` returns its ABI version.
 
 ## Documentation
 
+- API reference: https://quad4-software.github.io/landlockpy/
 - API: docstrings in `src/landlockpy/`, mostly `ruleset.py`
 - Landlock API reference: https://docs.kernel.org/userspace-api/landlock.html
 - Project site: https://landlock.io/
