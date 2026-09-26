@@ -13,7 +13,7 @@ test:
 	uv run pytest --cov --cov-report=term-missing
 
 docs:
-	uv run --group docs mkdocs build --strict
+	uv run --group docs zensical build --strict
 
 build:
 	uv build

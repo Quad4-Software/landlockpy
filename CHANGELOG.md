@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Docs now build with Zensical instead of mkdocs-material. The site
+  gains a light/dark/system palette toggle and the modern theme
+  variant.
+
 ## 0.2.0 - 2026-09-26
 
 - Add landlockpy.mute_subdomain_logs() wrapping the

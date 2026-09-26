@@ -33,7 +33,7 @@ jobs:
       - run: uv run bandit -r src/
       - run: uv run mypy
       - run: uvx ty check src tests
-      - run: uv run --group docs mkdocs build --strict
+      - run: uv run --group docs zensical build --strict
 
   test:
     runs-on: ubuntu-latest

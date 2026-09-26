@@ -5,9 +5,22 @@ repo_url: https://github.com/Quad4-Software/landlockpy
 copyright: Copyright Quad4, licensed 0BSD
 
 theme:
-  name: material
-  features:
-    - content.code.copy
+  variant: modern
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: lucide/sun-moon
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: lucide/sun
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: lucide/moon
+        name: Switch to system preference
 
 plugins:
   - search
