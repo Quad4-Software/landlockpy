@@ -24,7 +24,7 @@ from .flags import (
     restrict_for_abi,
     scope_for_abi,
 )
-from .ruleset import Ruleset
+from .ruleset import Ruleset, mute_subdomain_logs
 
 __version__ = "0.1.1"
 
@@ -40,6 +40,7 @@ __all__ = [
     "abi_version",
     "errata",
     "fs_for_abi",
+    "mute_subdomain_logs",
     "net_for_abi",
     "restrict_for_abi",
     "scope_for_abi",
@@ -51,8 +52,9 @@ __all__ = [
 def abi_version() -> int:
     """Return the Landlock ABI version of the running kernel, or 0.
 
-    A return value of 0 means the kernel is too old (ENOSYS) or Landlock is
-    disabled at boot time (EOPNOTSUPP).
+    A return value of 0 means Landlock is unavailable: the platform is not
+    Linux, the kernel is too old (ENOSYS), or Landlock is disabled at boot
+    time (EOPNOTSUPP).
     """
     try:
         return _syscall.abi_version()

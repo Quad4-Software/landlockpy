@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import operator
 import os
 import types
 
@@ -21,7 +22,7 @@ from .flags import (
     scope_for_abi,
 )
 
-__all__ = ["Ruleset"]
+__all__ = ["Ruleset", "mute_subdomain_logs"]
 
 
 class Ruleset:
@@ -120,8 +121,13 @@ class Ruleset:
             quiet_access_net=int(quiet_net),
             quiet_scoped=int(quiet_scoped),
         )
-        self._fd = _syscall.create_ruleset(attr)
-        os.set_inheritable(self._fd, False)
+        fd = _syscall.create_ruleset(attr)
+        try:
+            os.set_inheritable(fd, False)
+        except BaseException:
+            os.close(fd)
+            raise
+        self._fd = fd
         self._closed = False
 
     @staticmethod
@@ -229,6 +235,7 @@ class Ruleset:
         documentation.
         """
         self._check_mutable()
+        port = operator.index(port)
         if not 0 <= port <= 65535:
             raise ValueError(f"port out of range: {port}")
         quiet = self._gate_quiet(quiet)
@@ -245,10 +252,11 @@ class Ruleset:
     ) -> None:
         """Enforce the ruleset on the calling thread and its future children.
 
-        Flags unsupported by the running kernel are dropped. With
-        no_new_privs, the thread is also prevented from gaining privileges
-        through suid or file-capability binaries. On ABI 11 and newer this
-        is set atomically with enforcement. On older kernels a
+        Flags unsupported by the running kernel are dropped in best-effort
+        mode, or rejected with UnsupportedError when best_effort is False.
+        With no_new_privs, the thread is also prevented from gaining
+        privileges through suid or file-capability binaries. On ABI 11 and
+        newer this is set atomically with enforcement. On older kernels a
         prctl(PR_SET_NO_NEW_PRIVS) call is made first.
 
         Enforcement is irreversible and per-thread. Without the TSYNC flag
@@ -260,7 +268,11 @@ class Ruleset:
             raise RuntimeError("ruleset is closed")
         if self._enforced:
             raise RuntimeError("ruleset is already enforced")
-        effective = RestrictFlag(flags) & restrict_for_abi(self._abi)
+        effective = RestrictFlag(flags)
+        if self._best_effort:
+            effective &= restrict_for_abi(self._abi)
+        else:
+            self._reject_unsupported(effective, restrict_for_abi(self._abi), "restrict")
         if no_new_privs:
             if self._abi >= 11:
                 effective |= RestrictFlag.NO_NEW_PRIVS
@@ -272,14 +284,17 @@ class Ruleset:
     def close(self) -> None:
         """Close the ruleset file descriptor. Safe to call twice."""
         if not self._closed:
-            os.close(self._fd)
             self._closed = True
+            os.close(self._fd)
 
     def __copy__(self) -> Ruleset:
         raise TypeError("Ruleset cannot be copied: it owns a kernel file descriptor")
 
     def __deepcopy__(self, memo: dict[int, object]) -> Ruleset:
         raise TypeError("Ruleset cannot be copied: it owns a kernel file descriptor")
+
+    def __getstate__(self) -> None:
+        raise TypeError("Ruleset cannot be pickled: it owns a kernel file descriptor")
 
     def __repr__(self) -> str:
         state = "closed" if self._closed else "enforced" if self._enforced else "open"
@@ -303,3 +318,36 @@ class Ruleset:
         # __del__ must never raise
         with contextlib.suppress(Exception):
             self.close()
+
+
+def mute_subdomain_logs(
+    *, all_threads: bool = False, no_new_privs: bool = True
+) -> None:
+    """Suppress audit logging for Landlock domains nested under this one.
+
+    Calls landlock_restrict_self with a ruleset file descriptor of -1,
+    which updates the logging configuration without creating a new domain.
+    Denied accesses originating from nested domains created afterwards by
+    the caller or its descendants are not logged. Requires ABI 7.
+
+    With all_threads, the configuration is propagated to every thread of
+    the current process, which requires ABI 8.
+
+    Like restrict(), the kernel requires the calling thread to already run
+    with no_new_privs or hold CAP_SYS_ADMIN. With no_new_privs=True the
+    attribute is set via prctl(PR_SET_NO_NEW_PRIVS) first. The
+    LANDLOCK_RESTRICT_SELF_NO_NEW_PRIVS flag cannot be combined with a
+    ruleset file descriptor of -1, so prctl is used on every ABI. See
+    "Logging" and "Enforcing a ruleset" in the kernel documentation.
+    """
+    abi = _syscall.abi_version()
+    if abi < 7:
+        raise UnsupportedError("subdomain log control requires ABI 7")
+    flags = int(RestrictFlag.LOG_SUBDOMAINS_OFF)
+    if all_threads:
+        if abi < 8:
+            raise UnsupportedError("TSYNC requires ABI 8")
+        flags |= int(RestrictFlag.TSYNC)
+    if no_new_privs:
+        _syscall.set_no_new_privs()
+    _syscall.restrict_self(-1, flags)

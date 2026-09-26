@@ -32,6 +32,7 @@ RULE_NET_PORT = 2
 class RulesetAttr(ctypes.Structure):
     """struct landlock_ruleset_attr. The quiet fields need ABI 10."""
 
+    _layout_ = "gcc-sysv"
     _fields_ = [
         ("handled_access_fs", ctypes.c_uint64),
         ("handled_access_net", ctypes.c_uint64),
@@ -47,6 +48,7 @@ class PathBeneathAttr(ctypes.Structure):
 
     _pack_ = 1
     # Explicit layout: the implicit default is deprecated since Python 3.14.
+    # gcc-sysv does not support _pack_, so this uses the ms layout engine.
     _layout_ = "ms"
     _fields_ = [
         ("allowed_access", ctypes.c_uint64),
@@ -57,6 +59,7 @@ class PathBeneathAttr(ctypes.Structure):
 class NetPortAttr(ctypes.Structure):
     """struct landlock_net_port_attr."""
 
+    _layout_ = "gcc-sysv"
     _fields_ = [
         ("allowed_access", ctypes.c_uint64),
         ("port", ctypes.c_uint64),
@@ -70,7 +73,9 @@ def _get_libc() -> ctypes.CDLL:
     global _libc
     if _libc is None:
         if sys.platform != "linux":
-            raise UnsupportedError("Landlock is only available on Linux")
+            raise UnsupportedError(
+                errno.EOPNOTSUPP, "Landlock is only available on Linux"
+            )
         name = ctypes.util.find_library("c")
         _libc = ctypes.CDLL(name or None, use_errno=True)
         _libc.syscall.restype = ctypes.c_long
