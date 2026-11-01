@@ -92,7 +92,7 @@ def _probe_child(ruleset: Ruleset, fn: Callable[[], object], write_fd: int) -> i
     try:
         ruleset.restrict()
         fn()
-    except BaseException as exc:
+    except (Exception, SystemExit, KeyboardInterrupt) as exc:
         with contextlib.suppress(Exception):
             os.write(write_fd, f"{type(exc).__name__}: {exc}".encode()[:4000])
         if isinstance(exc, OSError) and exc.errno is not None and 0 < exc.errno < 255:

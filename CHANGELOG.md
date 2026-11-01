@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-11-01
+
 - Docs now build with Zensical instead of mkdocs-material. The site
   gains a light/dark/system palette toggle and the modern theme
   variant.
+- Dependencies and lockfile updated.
+- GitHub Actions pins and uv version updated.
+- Probe child no longer catches BaseException broadly.
 
 ## 0.2.0 - 2026-09-26
 

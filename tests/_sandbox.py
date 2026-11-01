@@ -61,14 +61,16 @@ def scenario_guards(denied_dir: str) -> None:
         ruleset.restrict()
         try:
             ruleset.allow_path(denied_dir, AccessFS.READ_FILE)
-            check("allow_path after restrict", False, "no error raised")
         except RuntimeError:
-            pass
+            check("allow_path after restrict", True)
+        else:
+            check("allow_path after restrict", False, "no error raised")
         try:
             ruleset.restrict()
-            check("second restrict", False, "no error raised")
         except RuntimeError:
-            pass
+            check("second restrict", True)
+        else:
+            check("second restrict", False, "no error raised")
 
     try:
         denied.read_text()
